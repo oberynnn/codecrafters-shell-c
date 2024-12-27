@@ -264,6 +264,10 @@ static void myPwd(void) {
 }
 
 static void myCd(char *dest) {
+	if (strcmp(dest, "~") == 0) {
+		char *home = getenv("HOME");
+		dest = home;
+	}
 	if (chdir(dest) < 0) {
 		fprintf(stderr, "cd: %s: No such file or directory\n", dest);
 	}
