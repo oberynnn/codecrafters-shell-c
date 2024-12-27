@@ -3,6 +3,7 @@
 #include <string.h>
 #include <stdbool.h>
 #include <stdlib.h>
+#include <sys/param.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -12,6 +13,7 @@
 #define 	EXIT_0 	"exit 0"
 #define 	ECHO 	"echo "
 #define 	TYPE 	"type "
+#define 	PWD 	"pwd"
 
 ///////////////////////////////////////////////////////////////////////////////
 // HELPER FUNCTION HEADERS
@@ -26,6 +28,7 @@ static void myTypeFile(char *str);
 static void myExec(char *path, int argc, char **argv);
 static bool fileExists(char *str);
 static char *getFile(char *str);
+static void myPwd(void);
 
 ///////////////////////////////////////////////////////////////////////////////
 // MAIN FUNCTION
@@ -61,6 +64,10 @@ static int driver(void) {
 			free(buffer);
 			continue;
 		}
+		else if (strcmp(input, PWD) == 0) {
+			myPwd();
+			continue;
+		}
 		else {
 			char *argv[15];
 			int argc = 0;
@@ -91,7 +98,7 @@ static void myEcho(char *str) {
 }
 
 static void myType(char *str) {
-	char commands[][16] = {"echo", "exit", "type"};
+	char commands[][16] = {"echo", "exit", "type", "pwd"};
 	int commandsSize = sizeof(commands) / sizeof(commands[0]);
 	if (myTypeCommandsCheck(str, commands, commandsSize) == true) {
 		myTypeCommands(str, commands, commandsSize);
@@ -239,4 +246,14 @@ static char *getFile(char *str) {
 	}
 	free(filePath);
 	return NULL;
+}
+
+static void myPwd(void) {
+	char *buffer = malloc(MAXPATHLEN * sizeof(char));
+	if (getcwd(buffer, MAXPATHLEN) != NULL) {
+		printf("%s\n", buffer);
+	}
+	else {
+		fprintf(stderr, "An error occurred.\n");
+	}
 }
