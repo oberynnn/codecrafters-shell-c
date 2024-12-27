@@ -14,6 +14,7 @@
 #define 	ECHO 	"echo "
 #define 	TYPE 	"type "
 #define 	PWD 	"pwd"
+#define 	CD		"cd"
 
 ///////////////////////////////////////////////////////////////////////////////
 // HELPER FUNCTION HEADERS
@@ -29,6 +30,7 @@ static void myExec(char *path, int argc, char **argv);
 static bool fileExists(char *str);
 static char *getFile(char *str);
 static void myPwd(void);
+static void myCd(char *dest) ;
 
 ///////////////////////////////////////////////////////////////////////////////
 // MAIN FUNCTION
@@ -68,6 +70,9 @@ static int driver(void) {
 			myPwd();
 			continue;
 		}
+		else if (strncmp(input, CD, 2 * sizeof(char)) == 0) {
+			myCd(input + 3);
+		}
 		else {
 			char *argv[15];
 			int argc = 0;
@@ -98,7 +103,7 @@ static void myEcho(char *str) {
 }
 
 static void myType(char *str) {
-	char commands[][16] = {"echo", "exit", "type", "pwd"};
+	char commands[][16] = {"echo", "exit", "type", "pwd", "cd"};
 	int commandsSize = sizeof(commands) / sizeof(commands[0]);
 	if (myTypeCommandsCheck(str, commands, commandsSize) == true) {
 		myTypeCommands(str, commands, commandsSize);
@@ -255,5 +260,11 @@ static void myPwd(void) {
 	}
 	else {
 		fprintf(stderr, "An error occurred.\n");
+	}
+}
+
+static void myCd(char *dest) {
+	if (chdir(dest) < 0) {
+		fprintf(stderr, "cd: %s: No such file or directory\n", dest);
 	}
 }
