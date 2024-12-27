@@ -30,7 +30,8 @@ static void myExec(char *path, int argc, char **argv);
 static bool fileExists(char *str);
 static char *getFile(char *str);
 static void myPwd(void);
-static void myCd(char *dest) ;
+static void myCd(char *dest);
+static char *parseSingleQuote(char *str);
 
 ///////////////////////////////////////////////////////////////////////////////
 // MAIN FUNCTION
@@ -55,6 +56,7 @@ static int driver(void) {
 		else if (strncmp(input, ECHO, 5 * sizeof(char)) == 0) {
 			char *buffer = malloc(100 * sizeof(char));
 			strcpy(buffer, input + 5);
+			buffer = parseSingleQuote(buffer);
 			myEcho(buffer);
 			free(buffer);
 			continue;
@@ -271,4 +273,15 @@ static void myCd(char *dest) {
 	if (chdir(dest) < 0) {
 		fprintf(stderr, "cd: %s: No such file or directory\n", dest);
 	}
+}
+
+static char *parseSingleQuote(char *str) {
+	int n = strlen(str), idx = 0;
+	char *parsed = malloc(n * sizeof(int));
+	for (int i = 0; i < n; i++) {
+		if (str[i] != '\'') {
+			parsed[idx++] = str[i];
+		}
+	}
+	return parsed;
 }
