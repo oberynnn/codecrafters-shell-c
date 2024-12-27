@@ -4,6 +4,8 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -21,6 +23,9 @@ static bool myTypeCommandsCheck(char *str, char commands[][16], int commandsSize
 static void myTypeCommands(char *str, char commands[][16], int commandsSize);
 static bool myTypeFileCheck(char *str);
 static void myTypeFile(char *str);
+static void myExec(char *path, int argc, char **argv);
+static bool fileExists(char *str);
+static char *getFile(char *str);
 
 ///////////////////////////////////////////////////////////////////////////////
 // MAIN FUNCTION
@@ -56,7 +61,23 @@ static int driver(void) {
 			free(buffer);
 			continue;
 		}
-		printf("%s: command not found\n", input);
+		else {
+			char *argv[15];
+			int argc = 0;
+			char *token = strtok(input, " ");
+			while (token != NULL && argc < 15) {
+				argv[argc++] = token;
+				token = strtok(NULL, " ");
+			}
+			argv[argc] = NULL;
+			char *path = getFile(argv[0]);
+			if (path != NULL) {
+				myExec(path, argc, argv);
+			}
+			else {
+				printf("%s: command not found\n", argv[0]);
+			}
+		}
 	}
 	return 0;
 }
@@ -155,4 +176,67 @@ static void myTypeFile(char *str) {
 	free(envPath);
 	printf("%s not found\n", str);
 	return;
+}
+
+static void myExec(char *path, int argc, char **argv) {
+	pid_t pid = fork();
+	if (pid == 0) {
+		execv(path, argv);
+		fprintf(stderr, "error in execv\n");
+		exit(1);
+	}
+	else if (pid < 0) {
+		fprintf(stderr, "error in fork\n");
+		exit(0);
+	}
+	else {
+		int status;
+		waitpid(pid, &status, 0);
+	}
+}
+
+static bool fileExists(char *str) {
+	char *path = getenv("PATH");
+	int pathLength = strlen(path);
+	char *filePath = malloc(pathLength * sizeof(char));
+	strcpy(filePath, path);
+	char *dirpath = strtok(filePath, ":");
+	while (dirpath != NULL) {
+		DIR *d = opendir(dirpath);
+		if (d == NULL) {
+			dirpath = strtok(NULL, ":");
+			continue;
+		}
+		struct dirent *file;
+		while ((file = readdir(d)) != NULL) {
+			if (strcmp(str, file->d_name) == 0) {
+				free(filePath);
+				closedir(d);
+				return true;
+			}
+		}
+		dirpath = strtok(NULL, ":");
+		closedir(d);
+	}
+	free(filePath);
+	return false;
+}
+
+static char *getFile(char *str) {
+	char *path = getenv("PATH");
+	int pathLength = strlen(path);
+	char *filePath = malloc(pathLength * sizeof(char));
+	strcpy(filePath, path);
+	char *dirPath = strtok(filePath, ":");
+	static char fullPath[1024];
+	while (dirPath != NULL) {
+		snprintf(fullPath, sizeof(fullPath), "%s/%s", dirPath, str);
+		if (access(fullPath, X_OK) == 0) {
+			free(filePath);
+			return fullPath;
+		}
+		dirPath = strtok(NULL, ":");
+	}
+	free(filePath);
+	return NULL;
 }
