@@ -1,3 +1,4 @@
+#include <ctype.h>
 #include <dirent.h>
 #include <stdio.h>
 #include <string.h>
@@ -15,6 +16,7 @@
 #define 	TYPE 	"type "
 #define 	PWD 	"pwd"
 #define 	CD		"cd"
+#define		CAT		"cat"
 
 ///////////////////////////////////////////////////////////////////////////////
 // HELPER FUNCTION HEADERS
@@ -32,6 +34,8 @@ static char *getFile(char *str);
 static void myPwd(void);
 static void myCd(char *dest);
 static char *parseSingleQuote(char *str);
+static void myCat(int argc, char *argv[]);
+static void readFile(const char *str);
 
 ///////////////////////////////////////////////////////////////////////////////
 // MAIN FUNCTION
@@ -74,6 +78,30 @@ static int driver(void) {
 		}
 		else if (strncmp(input, CD, 2 * sizeof(char)) == 0) {
 			myCd(input + 3);
+		}
+		else if (strncmp(input, CAT, 3 * sizeof(char)) == 0) {
+			char *buffer = malloc(100 * sizeof(char));
+			strcpy(buffer, input + 4);
+			char *argv[15];
+			int argc = 0;
+			char *current = buffer;
+			while (*current != '\0' && argc < 15) {
+				while (isspace(*current)) current++;
+				if (*current == '\'') {
+					current++;
+					argv[argc++] = current;
+					while (*current != '\'' && *current != '\0') current++;
+					if (*current == '\'') *current++ = '\0';
+				} else {
+					argv[argc++] = current;
+					while (!isspace(*current) && *current != '\0') current++;
+					if (*current != '\0') *current++ = '\0';
+				}
+			}
+			argv[argc] = NULL;
+			myCat(argc, argv);
+			free(buffer);
+			continue;
 		}
 		else {
 			char *argv[15];
@@ -276,12 +304,46 @@ static void myCd(char *dest) {
 }
 
 static char *parseSingleQuote(char *str) {
-	int n = strlen(str), idx = 0;
-	char *parsed = malloc(n * sizeof(int));
-	for (int i = 0; i < n; i++) {
-		if (str[i] != '\'') {
-			parsed[idx++] = str[i];
-		}
+    int n = strlen(str), idx = 0;
+    char *parsed = malloc((n + 1) * sizeof(char));
+    bool inQuotes = false;
+    for (int i = 0; i < n; i++) {
+        if (str[i] == '\'') {
+            inQuotes = !inQuotes;
+        } else if (inQuotes == true) {
+            parsed[idx++] = str[i];
+        } else if (isspace(str[i]) == false|| (idx > 0 && isspace(parsed[idx - 1]) == false)) {
+            parsed[idx++] = str[i];
+        }
+    }
+    if (idx > 0 && (isspace(parsed[idx - 1]) == true)) {
+        idx--;
+    }
+    parsed[idx] = '\0';
+    return parsed;
+}
+
+static void myCat(int argc, char *argv[]) {
+	for (int i = 0; i < argc; i++) {
+		readFile(argv[i]);
 	}
-	return parsed;
+	fflush(stdout);
+}
+
+static void readFile(const char *str) {
+    char *cleanPath = strdup(str);
+    if (cleanPath[0] == '\'' && cleanPath[strlen(cleanPath) - 1] == '\'') {
+        cleanPath[strlen(cleanPath) - 1] = '\0';
+        cleanPath++;
+    }
+    FILE *file = fopen(cleanPath, "r");
+    if (file == NULL) {
+        fprintf(stderr, "An error occurred: unable to open file %s\n", cleanPath);
+        return;
+    }
+    char ch;
+    while ((ch = fgetc(file)) != EOF) {
+        fputc(ch, stdout);
+    }
+    fclose(file);
 }
