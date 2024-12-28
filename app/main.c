@@ -40,6 +40,7 @@ static char *parseDoubleQuote(char *str);
 static bool singleQuoteCheck(char *str);
 static bool doubleQuoteCheck(char *str);
 static void noQuoteParse(char *str);
+static char *parseStringWithEscape(char *str);
 
 ///////////////////////////////////////////////////////////////////////////////
 // MAIN FUNCTION
@@ -78,6 +79,7 @@ static int driver(void) {
 			}
 			else {
 				noQuoteParse(buffer);
+				buffer = parseStringWithEscape(buffer);
 				myEcho(buffer);
 				free(buffer);
 				continue;
@@ -433,18 +435,47 @@ static bool doubleQuoteCheck(char *str) {
 
 static void noQuoteParse(char *str) {
 	int i = 0, j = 0;
-    int inWord = 0;
+    bool inWord = false;
     while (str[i] != '\0') {
         if (isspace(str[i]) == false) {
-            if (inWord == 0 && j > 0) {
+            if (inWord == false && j > 0) {
                 str[j++] = ' ';
             }
             str[j++] = str[i];
-            inWord = 1;
+            inWord = true;
         } else {
-            inWord = 0;
+            inWord = false;
         }
         i++;
     }
     str[j] = '\0';
+}
+
+static char *parseStringWithEscape(char *str) {
+    int n = strlen(str), idx = 0;
+    char *parsed = malloc((n + 1) * sizeof(char));
+    bool inQuotes = false;
+    char quoteChar = '\0';
+    for (int i = 0; i < n; i++) {
+        if (str[i] == '\\') { 
+            if (i + 1 < n) {
+                parsed[idx++] = str[++i];
+            }
+        } else if (str[i] == '\'' || str[i] == '\"') { 
+            if (inQuotes == false) {
+                inQuotes = true;
+                quoteChar = str[i];
+            } else if (quoteChar == str[i]) {
+                inQuotes = false;
+                quoteChar = '\0';
+            }
+        } else if (inQuotes == true || isspace(str[i]) == false || (idx > 0 && isspace(parsed[idx - 1]) == false)) {
+            parsed[idx++] = isspace(str[i]) && !inQuotes ? ' ' : str[i];
+        }
+    }
+    if (idx > 0 && isspace(parsed[idx - 1]) == true) {
+        idx--; 
+    }
+    parsed[idx] = '\0';
+    return parsed;
 }
