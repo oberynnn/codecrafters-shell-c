@@ -36,6 +36,10 @@ static void myCd(char *dest);
 static char *parseSingleQuote(char *str);
 static void myCat(int argc, char *argv[]);
 static void readFile(const char *str);
+static char *parseDoubleQuote(char *str);
+static bool singleQuoteCheck(char *str);
+static bool doubleQuoteCheck(char *str);
+static void noQuoteParse(char *str);
 
 ///////////////////////////////////////////////////////////////////////////////
 // MAIN FUNCTION
@@ -60,10 +64,24 @@ static int driver(void) {
 		else if (strncmp(input, ECHO, 5 * sizeof(char)) == 0) {
 			char *buffer = malloc(100 * sizeof(char));
 			strcpy(buffer, input + 5);
-			buffer = parseSingleQuote(buffer);
-			myEcho(buffer);
-			free(buffer);
-			continue;
+			if (singleQuoteCheck(buffer) == true) {
+				buffer = parseSingleQuote(buffer);
+				myEcho(buffer);
+				free(buffer);
+				continue;
+			}
+			else if (doubleQuoteCheck(buffer) == true) {
+				buffer = parseDoubleQuote(buffer);
+				myEcho(buffer);
+				free(buffer);
+				continue;
+			}
+			else {
+				noQuoteParse(buffer);
+				myEcho(buffer);
+				free(buffer);
+				continue;
+			}
 		}
 		else if (strncmp(input, TYPE, 5 * sizeof(char)) == 0) {
 			char *buffer = malloc(100 * sizeof(char));
@@ -82,26 +100,61 @@ static int driver(void) {
 		else if (strncmp(input, CAT, 3 * sizeof(char)) == 0) {
 			char *buffer = malloc(100 * sizeof(char));
 			strcpy(buffer, input + 4);
-			char *argv[15];
-			int argc = 0;
-			char *current = buffer;
-			while (*current != '\0' && argc < 15) {
-				while (isspace(*current)) current++;
-				if (*current == '\'') {
-					current++;
-					argv[argc++] = current;
-					while (*current != '\'' && *current != '\0') current++;
-					if (*current == '\'') *current++ = '\0';
-				} else {
-					argv[argc++] = current;
-					while (!isspace(*current) && *current != '\0') current++;
-					if (*current != '\0') *current++ = '\0';
+			if (singleQuoteCheck(buffer) == true) {
+				char *argv[15];
+				int argc = 0;
+				char *current = buffer;
+				while (*current != '\0' && argc < 15) {
+					while (isspace(*current)) current++;
+					if (*current == '\'') {
+						current++;
+						argv[argc++] = current;
+						while (*current != '\'' && *current != '\0') current++;
+						if (*current == '\'') *current++ = '\0';
+					} else {
+						argv[argc++] = current;
+						while (!isspace(*current) && *current != '\0') current++;
+						if (*current != '\0') *current++ = '\0';
+					}
 				}
+				argv[argc] = NULL;
+				myCat(argc, argv);
+				free(buffer);
+				continue;
 			}
-			argv[argc] = NULL;
-			myCat(argc, argv);
-			free(buffer);
-			continue;
+			else if (doubleQuoteCheck(buffer) == true) {
+				char *argv[15];
+    			int argc = 0;
+				char *current = buffer;
+				while (*current != '\0' && argc < 15) {
+					while (isspace(*current)) current++;  // Skip leading spaces
+					if (*current == '\'' || *current == '\"') {
+						char quote = *current++;  // Store the quote type and move past it
+						argv[argc++] = current;  // Start of the quoted string
+						while (*current != quote && *current != '\0') current++;
+						if (*current == quote) *current++ = '\0';  // Null-terminate and skip closing quote
+					} else {
+						argv[argc++] = current;  // Start of unquoted string
+						while (!isspace(*current) && *current != '\0') current++;
+						if (*current != '\0') *current++ = '\0';  // Null-terminate the argument
+					}
+				}
+				argv[argc] = NULL; // Null-terminate the argument list
+				myCat(argc, argv); // Call myCat with the parsed arguments
+				free(buffer);
+				continue;
+			}
+			else {
+				char *argv[15];
+				int argc = 0;
+				char *current = buffer;
+				while (*current != '\0' && argc < 15) {
+					while (isspace(*current) == true) current++;
+					
+				}
+				free(buffer);
+				continue;
+			}
 		}
 		else {
 			char *argv[15];
@@ -346,4 +399,52 @@ static void readFile(const char *str) {
         fputc(ch, stdout);
     }
     fclose(file);
+}
+
+static char *parseDoubleQuote(char *str) {
+    int n = strlen(str), idx = 0;
+    char *parsed = malloc((n + 1) * sizeof(char));
+    bool inQuotes = false;
+    for (int i = 0; i < n; i++) {
+        if (str[i] == '\"') {
+            inQuotes = !inQuotes;
+        } else if (inQuotes == true || isspace(str[i]) == false) {
+            parsed[idx++] = str[i];
+        } else if (idx > 0 && isspace(parsed[idx - 1]) == false) {
+            parsed[idx++] = ' ';
+        }
+    }
+    if (idx > 0 && isspace(parsed[idx - 1]) == true) {
+        idx--;
+    }
+    parsed[idx] = '\0';
+    return parsed;
+}
+
+static bool singleQuoteCheck(char *str) {
+	int len = strlen(str);
+	return str[0] == '\'' && str[len - 1] == '\'';
+}
+
+static bool doubleQuoteCheck(char *str) {
+	int len = strlen(str);
+	return str[0] == '\"' && str[len - 1] == '\"';
+}
+
+static void noQuoteParse(char *str) {
+	int i = 0, j = 0;
+    int inWord = 0;
+    while (str[i] != '\0') {
+        if (isspace(str[i]) == false) {
+            if (inWord == 0 && j > 0) {
+                str[j++] = ' ';
+            }
+            str[j++] = str[i];
+            inWord = 1;
+        } else {
+            inWord = 0;
+        }
+        i++;
+    }
+    str[j] = '\0';
 }
