@@ -40,7 +40,9 @@ static char *parseDoubleQuote(char *str);
 static bool singleQuoteCheck(char *str);
 static bool doubleQuoteCheck(char *str);
 static void noQuoteParse(char *str);
-static char *parseStringWithEscape(char *str);
+static char *parseStringWithEscapeNoQuotes(char *str);
+static void parseStringWithEscapeDoubleQuotes(const char *input);
+static bool doubleQuotesHasBackSlash(char *str);
 
 ///////////////////////////////////////////////////////////////////////////////
 // MAIN FUNCTION
@@ -72,14 +74,21 @@ static int driver(void) {
 				continue;
 			}
 			else if (doubleQuoteCheck(buffer) == true) {
-				buffer = parseDoubleQuote(buffer);
-				myEcho(buffer);
-				free(buffer);
-				continue;
+				if (doubleQuotesHasBackSlash(buffer) == true) {
+					parseStringWithEscapeDoubleQuotes(buffer);
+					free(buffer);
+					continue;
+				}
+				else {
+					buffer = parseDoubleQuote(buffer);
+					printf("%s\n", buffer);
+					free(buffer);
+					continue;
+				}
 			}
 			else {
 				noQuoteParse(buffer);
-				buffer = parseStringWithEscape(buffer);
+				buffer = parseStringWithEscapeNoQuotes(buffer);
 				myEcho(buffer);
 				free(buffer);
 				continue;
@@ -183,8 +192,8 @@ static void myExit(void) {
 	exit(EXIT_SUCCESS);
 }
 
-static void myEcho(char *str) {
-	printf("%s\n", str);
+static void myEcho(char *input) {
+	printf("%s\n", input);
 }
 
 static void myType(char *str) {
@@ -451,7 +460,7 @@ static void noQuoteParse(char *str) {
     str[j] = '\0';
 }
 
-static char *parseStringWithEscape(char *str) {
+static char *parseStringWithEscapeNoQuotes(char *str) {
     int n = strlen(str), idx = 0;
     char *parsed = malloc((n + 1) * sizeof(char));
     bool inQuotes = false;
@@ -478,4 +487,42 @@ static char *parseStringWithEscape(char *str) {
     }
     parsed[idx] = '\0';
     return parsed;
+}
+
+static void parseStringWithEscapeDoubleQuotes(const char *input) {
+	int i = 0;
+    int in_single_quotes = 0;
+    int in_double_quotes = 0;
+
+    while (input[i] != '\0') {
+        if (input[i] == '\'' && !in_double_quotes) {
+            in_single_quotes = !in_single_quotes; // Toggle single quotes
+        } else if (input[i] == '"' && !in_single_quotes) {
+            in_double_quotes = !in_double_quotes; // Toggle double quotes
+        } else if (input[i] == '\\' && input[i + 1] != '\0') {
+            // Handle escape sequences
+            i++;
+            if (input[i] == 'n') {
+                putchar('\n');
+            } else if (input[i] == 't') {
+                putchar('\t');
+            } else {
+                putchar(input[i]); // Print the escaped character
+            }
+        } else {
+            putchar(input[i]); // Print normal characters
+        }
+        i++;
+    }
+    putchar('\n');
+}
+
+static bool doubleQuotesHasBackSlash(char *str) {
+	int n = strlen(str);
+	for (int i = 0; i < n; i++) {
+		if (str[i] == '\\') {
+			return true;
+		}
+	}
+	return false;
 }
