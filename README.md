@@ -40,11 +40,11 @@ The shell runs in a loop, waiting for user input, parsing it, and executing the 
 1. Clone the repository:
    ```bash
    git clone <repository-url>
-   cd unix-shell
+   cd app
    ```
 2. Compile the shell:
    ```bash
-   gcc shell.c -o shell
+   gcc main.c -o shell
    ```
 3. Run the shell:
    ```bash
