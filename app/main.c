@@ -1,5 +1,6 @@
 #include <ctype.h>
 #include <dirent.h>
+#include <fcntl.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdbool.h>
@@ -44,6 +45,7 @@ static char *parseStringWithEscapeNoQuotes(char *str);
 static void parseStringWithEscapeDoubleQuotes(const char *input);
 static bool doubleQuotesHasBackSlash(char *str);
 static char *stripQuotesAndEscapes(char *str);
+static void stdoutRedirection(char *file, char *str);
 
 ///////////////////////////////////////////////////////////////////////////////
 // MAIN FUNCTION
@@ -117,16 +119,26 @@ static int driver(void) {
 				int argc = 0;
 				char *current = buffer;
 				while (*current != '\0' && argc < 15) {
-					while (isspace(*current)) current++;
+					while (isspace(*current) == true) {
+						current++;
+					}
 					if (*current == '\'') {
 						current++;
 						argv[argc++] = current;
-						while (*current != '\'' && *current != '\0') current++;
-						if (*current == '\'') *current++ = '\0';
+						while (*current != '\'' && *current != '\0') {
+							current++;
+						}
+						if (*current == '\'') {
+							*current++ = '\0';
+						}
 					} else {
 						argv[argc++] = current;
-						while (!isspace(*current) && *current != '\0') current++;
-						if (*current != '\0') *current++ = '\0';
+						while (isspace(*current) == false&& *current != '\0') {
+							current++;
+						}
+						if (*current != '\0') {
+							*current++ = '\0';
+						}
 					}
 				}
 				argv[argc] = NULL;
@@ -139,20 +151,28 @@ static int driver(void) {
     			int argc = 0;
 				char *current = buffer;
 				while (*current != '\0' && argc < 15) {
-					while (isspace(*current)) current++;  // Skip leading spaces
+					while (isspace(*current) == true) {
+						current++;
+					}
 					if (*current == '\'' || *current == '\"') {
-						char quote = *current++;  // Store the quote type and move past it
-						argv[argc++] = current;  // Start of the quoted string
+						char quote = *current++; 
+						argv[argc++] = current;  
 						while (*current != quote && *current != '\0') current++;
-						if (*current == quote) *current++ = '\0';  // Null-terminate and skip closing quote
+						if (*current == quote) {
+							*current++ = '\0'; 
+						}
 					} else {
-						argv[argc++] = current;  // Start of unquoted string
-						while (!isspace(*current) && *current != '\0') current++;
-						if (*current != '\0') *current++ = '\0';  // Null-terminate the argument
+						argv[argc++] = current;
+						while (isspace(*current) == false && *current != '\0') {
+							current++;
+						}
+						if (*current != '\0') {
+							*current++ = '\0';
+						}  
 					}
 				}
-				argv[argc] = NULL; // Null-terminate the argument list
-				myCat(argc, argv); // Call myCat with the parsed arguments
+				argv[argc] = NULL;
+				myCat(argc, argv);
 				free(buffer);
 				continue;
 			}
@@ -161,8 +181,9 @@ static int driver(void) {
 				int argc = 0;
 				char *current = buffer;
 				while (*current != '\0' && argc < 15) {
-					while (isspace(*current) == true) current++;
-					
+					while (isspace(*current) == true) {
+						current++;
+					}	
 				}
 				free(buffer);
 				continue;
@@ -173,7 +194,9 @@ static int driver(void) {
 			int argc = 0;
 			char *current = input;
 			while (*current != '\0' && argc < 15) {
-				while (isspace(*current)) current++;  // Skip spaces
+				while (isspace(*current) == true) {
+					current++;
+				} 
 				if (*current == '\'' || *current == '\"') {
 					char quote = *current++;
 					argv[argc++] = current;
@@ -181,7 +204,7 @@ static int driver(void) {
 					if (*current == quote) *current++ = '\0';
 				} else {
 					argv[argc++] = current;
-					while (!isspace(*current) && *current != '\0') current++;
+					while (isspace(*current) == false && *current != '\0') current++;
 					if (*current != '\0') *current++ = '\0';
 				}
 			}
@@ -559,4 +582,16 @@ static char *stripQuotesAndEscapes(char *str) {
     }
     result[idx] = '\0';
     return result;
+}
+
+static void stdoutRedirection(char *file, char *str) {
+	int fd = open(file, O_WRONLY | O_TRUNC | O_CREAT, 0644);
+	if (fd == -1) {
+		fprintf(stderr, "Error in opening output file\n");
+	}
+	if (dup2(fd, STDOUT_FILENO) == -1) {
+		fprintf(stderr, "Error in dup2\n");
+		close(fd);
+	}
+	printf("%s", str);
 }

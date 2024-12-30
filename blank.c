@@ -1,46 +1,24 @@
 #include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
+#include <unistd.h>
+#include <fcntl.h>
 
-void myEcho(const char *input) {
-    int i = 0;
-    int in_single_quotes = 0;
-    int in_double_quotes = 0;
-
-    while (input[i] != '\0') {
-        if (input[i] == '\'' && !in_double_quotes) {
-            in_single_quotes = !in_single_quotes; // Toggle single quotes
-        } else if (input[i] == '"' && !in_single_quotes) {
-            in_double_quotes = !in_double_quotes; // Toggle double quotes
-        } else if (input[i] == '\\' && input[i + 1] != '\0') {
-            // Handle escape sequences
-            i++;
-            if (input[i] == 'n') {
-                putchar('\n');
-            } else if (input[i] == 't') {
-                putchar('\t');
-            } else {
-                putchar(input[i]); // Print the escaped character
-            }
-        } else {
-            putchar(input[i]); // Print normal characters
-        }
-        i++;
+int main(void) {
+    int fd = open("output.txt", O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    if (fd == -1) {
+        perror("open");
+        return 1;
     }
-    putchar('\n');
-}
 
-int main() {
-    char buffer[1024];
-    while (fgets(buffer, sizeof(buffer), stdin) != NULL) {
-        buffer[strcspn(buffer, "\n")] = '\0'; // Remove trailing newline
-        if (strncmp(buffer, "echo ", 5) == 0) {
-            myEcho(buffer + 5);
-        } else if (strncmp(buffer, "cat ", 4) == 0) {
-            printf("cat command is not handled in this program.\n");
-        } else {
-            printf("Unknown command: %s\n", buffer);
-        }
+    // Redirect standard output to the file
+    if (dup2(fd, STDOUT_FILENO) == -1) {
+        perror("dup2");
+        close(fd);
+        return 1;
     }
+
+    // Now printf will write to output.txt instead of the console
+    printf("This will be written to output.txt\n");
+
+    close(fd);
     return 0;
 }
