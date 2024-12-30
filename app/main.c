@@ -43,6 +43,7 @@ static void noQuoteParse(char *str);
 static char *parseStringWithEscapeNoQuotes(char *str);
 static void parseStringWithEscapeDoubleQuotes(const char *input);
 static bool doubleQuotesHasBackSlash(char *str);
+static char *stripQuotesAndEscapes(char *str);
 
 ///////////////////////////////////////////////////////////////////////////////
 // MAIN FUNCTION
@@ -170,10 +171,19 @@ static int driver(void) {
 		else {
 			char *argv[15];
 			int argc = 0;
-			char *token = strtok(input, " ");
-			while (token != NULL && argc < 15) {
-				argv[argc++] = token;
-				token = strtok(NULL, " ");
+			char *current = input;
+			while (*current != '\0' && argc < 15) {
+				while (isspace(*current)) current++;  // Skip spaces
+				if (*current == '\'' || *current == '\"') {
+					char quote = *current++;
+					argv[argc++] = current;
+					while (*current != quote && *current != '\0') current++;
+					if (*current == quote) *current++ = '\0';
+				} else {
+					argv[argc++] = current;
+					while (!isspace(*current) && *current != '\0') current++;
+					if (*current != '\0') *current++ = '\0';
+				}
 			}
 			argv[argc] = NULL;
 			char *path = getFile(argv[0]);
@@ -329,6 +339,7 @@ static bool fileExists(char *str) {
 }
 
 static char *getFile(char *str) {
+	char *cleaned = stripQuotesAndEscapes(str);
 	char *path = getenv("PATH");
 	int pathLength = strlen(path);
 	char *filePath = malloc(pathLength * sizeof(char));
@@ -525,4 +536,27 @@ static bool doubleQuotesHasBackSlash(char *str) {
 		}
 	}
 	return false;
+}
+
+static char *stripQuotesAndEscapes(char *str) {
+    size_t len = strlen(str);
+    char *result = malloc((len + 1) * sizeof(char));
+    size_t idx = 0;
+
+    bool inQuotes = false;
+    char quoteType = '\0';
+    for (size_t i = 0; i < len; ++i) {
+        if ((str[i] == '\'' || str[i] == '"') && !inQuotes) {
+            inQuotes = true;
+            quoteType = str[i];
+        } else if (str[i] == quoteType && inQuotes) {
+            inQuotes = false;
+        } else if (str[i] == '\\' && i + 1 < len) {
+            result[idx++] = str[++i];  // Add escaped character
+        } else {
+            result[idx++] = str[i];
+        }
+    }
+    result[idx] = '\0';
+    return result;
 }
