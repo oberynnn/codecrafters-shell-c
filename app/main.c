@@ -29,7 +29,7 @@ static bool myTypeCommandsCheck(char *str, char commands[][16], int commandsSize
 static void myTypeCommands(char *str, char commands[][16], int commandsSize);
 static bool myTypeFileCheck(char *str);
 static void myTypeFile(char *str);
-static void myExec(char *path, int argc, char **argv);
+static void myExec(char *path, int argc, char **argv, int redirect_fd);
 static bool fileExists(char *str);
 static char *getFile(char *str);
 static void myPwd(void);
@@ -58,11 +58,39 @@ static int driver(void) {
 	while (true) {
 		setbuf(stdout, NULL);
 		printf("$ ");
+
 		// Wait for user input
 		char input[100];
 		fgets(input, 100, stdin);
 		int inputLength = strlen(input);
-		input[inputLength - 1] = '\0';
+		input[strcspn(input, "\n")] = '\0';
+
+		// Detect and parse redirection (>)
+		char *redirect = strchr(input, '>');
+		int redirect_fd = STDOUT_FILENO; // Default to standard output
+		if (redirect) {
+			*redirect = '\0'; // Split command and file
+			redirect++; // Move past '>'
+
+			// Handle optional "1>" case
+			while (*redirect == ' ' || *redirect == '1') {
+				redirect++;
+			}
+
+			// Trim spaces
+			while (*redirect == ' ') {
+				redirect++;
+			}
+
+			// Open the file for writing
+			int fd = open(redirect, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+			if (fd < 0) {
+				perror("open");
+				continue; // Skip this iteration if file can't be opened
+			}
+			redirect_fd = fd; // Update output stream
+		}
+
 		if (strcmp(input, EXIT_0) == 0) {
 			myExit();
 		}
@@ -210,7 +238,7 @@ static int driver(void) {
 			argv[argc] = NULL;
 			char *path = getFile(argv[0]);
 			if (path != NULL) {
-				myExec(path, argc, argv);
+				myExec(path, argc, argv, redirect_fd);
 			}
 			else {
 				printf("%s: command not found\n", argv[0]);
@@ -316,21 +344,26 @@ static void myTypeFile(char *str) {
 	return;
 }
 
-static void myExec(char *path, int argc, char **argv) {
-	pid_t pid = fork();
-	if (pid == 0) {
-		execv(path, argv);
-		fprintf(stderr, "error in execv\n");
-		exit(1);
-	}
-	else if (pid < 0) {
-		fprintf(stderr, "error in fork\n");
-		exit(0);
-	}
-	else {
-		int status;
-		waitpid(pid, &status, 0);
-	}
+static void myExec(char *path, int argc, char **argv, int redirect_fd) {
+    pid_t pid = fork();
+    if (pid == 0) { // Child process
+        if (redirect_fd != STDOUT_FILENO) {
+            dup2(redirect_fd, STDOUT_FILENO);
+            close(redirect_fd);
+        }
+        execv(path, argv);
+        perror("execv");
+        exit(1);
+    } else if (pid < 0) {
+        perror("fork");
+        exit(1);
+    } else {
+        int status;
+        waitpid(pid, &status, 0);
+        if (redirect_fd != STDOUT_FILENO) {
+            close(redirect_fd); // Close file in parent process
+        }
+    }
 }
 
 static bool fileExists(char *str) {
