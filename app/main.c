@@ -45,7 +45,6 @@ static char *parseStringWithEscapeNoQuotes(char *str);
 static void parseStringWithEscapeDoubleQuotes(const char *input);
 static bool doubleQuotesHasBackSlash(char *str);
 static char *stripQuotesAndEscapes(char *str);
-static void stdoutRedirection(char *file, char *str);
 
 ///////////////////////////////////////////////////////////////////////////////
 // MAIN FUNCTION
@@ -582,16 +581,4 @@ static char *stripQuotesAndEscapes(char *str) {
     }
     result[idx] = '\0';
     return result;
-}
-
-static void stdoutRedirection(char *file, char *str) {
-	int fd = open(file, O_WRONLY | O_TRUNC | O_CREAT, 0644);
-	if (fd == -1) {
-		fprintf(stderr, "Error in opening output file\n");
-	}
-	if (dup2(fd, STDOUT_FILENO) == -1) {
-		fprintf(stderr, "Error in dup2\n");
-		close(fd);
-	}
-	printf("%s", str);
 }
