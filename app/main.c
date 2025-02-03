@@ -348,11 +348,11 @@ static void myExec(char *path, int argc, char **argv, int redirect_fd) {
     pid_t pid = fork();
     if (pid == 0) { // Child process
         if (redirect_fd != STDOUT_FILENO) {
-            dup2(redirect_fd, STDOUT_FILENO);
-            close(redirect_fd);
+            dup2(redirect_fd, STDOUT_FILENO); // Redirect stdout to file
+            close(redirect_fd); // Close extra file descriptor
         }
         execv(path, argv);
-        perror("execv");
+        perror("execv"); // If execv fails
         exit(1);
     } else if (pid < 0) {
         perror("fork");
