@@ -29,7 +29,7 @@ static bool myTypeCommandsCheck(char *str, char commands[][16], int commandsSize
 static void myTypeCommands(char *str, char commands[][16], int commandsSize);
 static bool myTypeFileCheck(char *str);
 static void myTypeFile(char *str);
-static void myExec(char *path, int argc, char **argv, int redirect_fd);
+static void myExec(char *path, int argc, char **argv);
 static bool fileExists(char *str);
 static char *getFile(char *str);
 static void myPwd(void);
@@ -65,19 +65,6 @@ static int driver(void) {
 		fgets(input, 100, stdin);
 		int inputLength = strlen(input);
 		input[strcspn(input, "\n")] = '\0';
-
-		char *redirectStdout = strstr(input, "1>");
-		int redirectFd;
-		if (redirectStdout != NULL) {
-			redirectStdout += 2;
-			while (*redirectStdout == ' ') {
-				redirectStdout++;
-			}
-			redirectFd = open(redirectStdout, O_WRONLY | O_CREAT | O_TRUNC, 0644);
-		}
-		else {
-			redirectFd = 0;
-		}
 
 		if (strcmp(input, EXIT_0) == 0) {
 			myExit();
@@ -226,7 +213,7 @@ static int driver(void) {
 			argv[argc] = NULL;
 			char *path = getFile(argv[0]);
 			if (path != NULL) {
-				myExec(path, argc, argv, redirectFd);
+				myExec(path, argc, argv);
 			}
 			else {
 				printf("%s: command not found\n", argv[0]);
@@ -332,13 +319,9 @@ static void myTypeFile(char *str) {
 	return;
 }
 
-static void myExec(char *path, int argc, char **argv, int redirect_fd) {
+static void myExec(char *path, int argc, char **argv) {
     pid_t pid = fork();
     if (pid == 0) { // Child process
-        if (redirect_fd != STDOUT_FILENO) {
-            dup2(redirect_fd, STDOUT_FILENO);
-            close(redirect_fd);
-        }
         execv(path, argv);
         perror("execv");
         exit(1);
@@ -348,9 +331,6 @@ static void myExec(char *path, int argc, char **argv, int redirect_fd) {
     } else {
         int status;
         waitpid(pid, &status, 0);
-        if (redirect_fd != STDOUT_FILENO) {
-            close(redirect_fd); // Close file in parent process
-        }
     }
 }
 
