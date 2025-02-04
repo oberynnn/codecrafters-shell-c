@@ -45,6 +45,7 @@ static char *parseStringWithEscapeNoQuotes(char *str);
 static void parseStringWithEscapeDoubleQuotes(const char *input);
 static bool doubleQuotesHasBackSlash(char *str);
 static char *stripQuotesAndEscapes(char *str);
+static int redirectStdoutToFile(const char *filename);
 
 ///////////////////////////////////////////////////////////////////////////////
 // MAIN FUNCTION
@@ -65,30 +66,17 @@ static int driver(void) {
 		int inputLength = strlen(input);
 		input[strcspn(input, "\n")] = '\0';
 
-		// Detect and parse redirection (>)
-		char *redirect = strchr(input, '>');
-		int redirect_fd = STDOUT_FILENO; // Default to standard output
-		if (redirect) {
-			*redirect = '\0'; // Split command and file
-			redirect++; // Move past '>'
-
-			// Handle optional "1>" case
-			while (*redirect == ' ' || *redirect == '1') {
-				redirect++;
+		char *redirectStdout = strstr(input, "1>");
+		int redirectFd;
+		if (redirectStdout != NULL) {
+			redirectStdout += 2;
+			while (*redirectStdout == ' ') {
+				redirectStdout++;
 			}
-
-			// Trim spaces
-			while (*redirect == ' ') {
-				redirect++;
-			}
-
-			// Open the file for writing
-			int fd = open(redirect, O_WRONLY | O_CREAT | O_TRUNC, 0644);
-			if (fd < 0) {
-				perror("open");
-				continue; // Skip this iteration if file can't be opened
-			}
-			redirect_fd = fd; // Update output stream
+			redirectFd = open(redirectStdout, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+		}
+		else {
+			redirectFd = 0;
 		}
 
 		if (strcmp(input, EXIT_0) == 0) {
@@ -238,7 +226,7 @@ static int driver(void) {
 			argv[argc] = NULL;
 			char *path = getFile(argv[0]);
 			if (path != NULL) {
-				myExec(path, argc, argv, redirect_fd);
+				myExec(path, argc, argv, redirectFd);
 			}
 			else {
 				printf("%s: command not found\n", argv[0]);
@@ -614,4 +602,21 @@ static char *stripQuotesAndEscapes(char *str) {
     }
     result[idx] = '\0';
     return result;
+}
+
+static int redirectStdoutToFile(const char *filename) {
+    int fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    if (fd == -1) {
+        perror("open");
+        return -1;
+    }
+    
+    if (dup2(fd, STDOUT_FILENO) == -1) {
+        perror("dup2");
+        close(fd);
+        return -1;
+    }
+    
+    close(fd);
+    return 0;
 }
