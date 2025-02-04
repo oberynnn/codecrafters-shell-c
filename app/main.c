@@ -101,13 +101,14 @@ static int driver(void) {
                 myCd(cleanedInput + 3);
             } else if (strcmp(token, "cat") == 0) {
                 char *argv[15];
-                int argc = 0;
-                while (token != NULL && argc < 15) {
-                    argv[argc++] = token;
-                    token = strtok(NULL, " ");
-                }
-                argv[argc] = NULL;
-                myCat(argc, argv);
+				int argc = 0;
+				char *token = strtok(cleanedInput + 4, " ");
+				while (token != NULL && argc < 15) {
+					argv[argc++] = token;
+					token = strtok(NULL, " ");
+				}
+				argv[argc] = NULL;
+				myCat(argc, argv);
             } else {
                 char *argv[15];
                 int argc = 0;
@@ -152,7 +153,7 @@ static int driver(void) {
         free(cleanedInput);
         }
 		else {
-				if (strcmp(input, EXIT_0) == 0) {
+			if (strcmp(input, EXIT_0) == 0) {
 				myExit();
 			}
 			else if (strncmp(input, ECHO, 5 * sizeof(char)) == 0) {
@@ -221,7 +222,7 @@ static int driver(void) {
 							}
 						} else {
 							argv[argc++] = current;
-							while (isspace(*current) == false&& *current != '\0') {
+							while (isspace(*current) == false && *current != '\0') {
 								current++;
 							}
 							if (*current != '\0') {
@@ -268,13 +269,36 @@ static int driver(void) {
 					char *argv[15];
 					int argc = 0;
 					char *current = buffer;
+
 					while (*current != '\0' && argc < 15) {
-						while (isspace(*current) == true) {
-							current++;
-						}	
+						while (isspace(*current)) {
+							current++;  // Skip leading spaces
+						}
+
+						if (*current == '\'' || *current == '\"') {
+							char quote = *current++;  // Detect if it's single or double quote
+							argv[argc++] = current;   // Save start of filename
+							while (*current != quote && *current != '\0') {
+								current++;
+							}
+							if (*current == quote) {
+								*current++ = '\0';  // Terminate string
+							}
+						} else {
+							argv[argc++] = current;  // Save unquoted filename
+							while (*current != '\0' && !isspace(*current)) {
+								current++;
+							}
+							if (*current != '\0') {
+								*current++ = '\0';  // Terminate filename
+							}
+						}
 					}
+					argv[argc] = NULL;
+
+					myCat(argc, argv);  // Execute cat with parsed filenames
 					free(buffer);
-					continue;
+    				continue;
 				}
 			}
 			else {
@@ -523,7 +547,7 @@ static void readFile(const char *str) {
     }
     FILE *file = fopen(cleanPath, "r");
     if (file == NULL) {
-        fprintf(stderr, "An error occurred: unable to open file %s\n", cleanPath);
+        fprintf(stderr, "cat: %s: No such file or directory\n", cleanPath);
         return;
     }
     char ch;
