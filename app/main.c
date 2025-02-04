@@ -66,157 +66,244 @@ static int driver(void) {
 		int inputLength = strlen(input);
 		input[strcspn(input, "\n")] = '\0';
 
-		if (strcmp(input, EXIT_0) == 0) {
-			myExit();
-		}
-		else if (strncmp(input, ECHO, 5 * sizeof(char)) == 0) {
-			char *buffer = malloc(100 * sizeof(char));
-			strcpy(buffer, input + 5);
-			if (singleQuoteCheck(buffer) == true) {
-				buffer = parseSingleQuote(buffer);
-				myEcho(buffer);
+		char *redir = strstr(input, "1>");
+        if (redir != NULL) {
+            memmove(redir, redir + 1, strlen(redir));  // Remove '1'
+        }
+        redir = strchr(input, '>'); // Find `>`
+
+        char *filename = NULL;
+        if (redir != NULL) {
+            *redir = '\0';  // Split command and filename
+            redir++;
+            while (isspace(*redir)) redir++; // Remove leading spaces
+            filename = stripQuotesAndEscapes(redir); // ✅ Remove quotes from filename
+        	char *cleanedInput = stripQuotesAndEscapes(input);
+
+			if (filename != NULL) {
+            int saved_stdout = dup(STDOUT_FILENO);
+            if (redirectStdoutToFile(filename) == -1) {
+                free(cleanedInput);
+                continue; // Error handling, skip this iteration
+            }
+
+            // Execute the command
+            char *token = strtok(cleanedInput, " ");
+            if (token == NULL) continue; // Ignore empty input
+
+            if (strcmp(token, "echo") == 0) {
+                myEcho(cleanedInput + 5);
+            } else if (strcmp(token, "type") == 0) {
+                myType(cleanedInput + 5);
+            } else if (strcmp(token, "pwd") == 0) {
+                myPwd();
+            } else if (strcmp(token, "cd") == 0) {
+                myCd(cleanedInput + 3);
+            } else if (strcmp(token, "cat") == 0) {
+                char *argv[15];
+                int argc = 0;
+                while (token != NULL && argc < 15) {
+                    argv[argc++] = token;
+                    token = strtok(NULL, " ");
+                }
+                argv[argc] = NULL;
+                myCat(argc, argv);
+            } else {
+                char *argv[15];
+                int argc = 0;
+                while (token != NULL && argc < 15) {
+                    argv[argc++] = token;
+                    token = strtok(NULL, " ");
+                }
+                argv[argc] = NULL;
+                char *path = getFile(argv[0]);
+                if (path != NULL) {
+                    myExec(path, argc, argv);
+                } else {
+                    fprintf(stderr, "%s: command not found\n", argv[0]);
+                }
+            }
+
+            fflush(stdout);
+            dup2(saved_stdout, STDOUT_FILENO); // Restore stdout
+            close(saved_stdout);
+        } else {
+            // Execute command normally (without redirection)
+            if (strcmp(cleanedInput, "exit 0") == 0) {
+                free(cleanedInput);
+                myExit();
+            } else {
+                char *argv[15];
+                int argc = 0;
+                char *token = strtok(cleanedInput, " ");
+                while (token != NULL && argc < 15) {
+                    argv[argc++] = token;
+                    token = strtok(NULL, " ");
+                }
+                argv[argc] = NULL;
+                char *path = getFile(argv[0]);
+                if (path != NULL) {
+                    myExec(path, argc, argv);
+                } else {
+                    fprintf(stderr, "%s: command not found\n", argv[0]);
+                }
+            }
+        }
+        free(cleanedInput);
+        }
+		else {
+				if (strcmp(input, EXIT_0) == 0) {
+				myExit();
+			}
+			else if (strncmp(input, ECHO, 5 * sizeof(char)) == 0) {
+				char *buffer = malloc(100 * sizeof(char));
+				strcpy(buffer, input + 5);
+				if (singleQuoteCheck(buffer) == true) {
+					buffer = parseSingleQuote(buffer);
+					myEcho(buffer);
+					free(buffer);
+					continue;
+				}
+				else if (doubleQuoteCheck(buffer) == true) {
+					if (doubleQuotesHasBackSlash(buffer) == true) {
+						parseStringWithEscapeDoubleQuotes(buffer);
+						free(buffer);
+						continue;
+					}
+					else {
+						buffer = parseDoubleQuote(buffer);
+						printf("%s\n", buffer);
+						free(buffer);
+						continue;
+					}
+				}
+				else {
+					noQuoteParse(buffer);
+					buffer = parseStringWithEscapeNoQuotes(buffer);
+					myEcho(buffer);
+					free(buffer);
+					continue;
+				}
+			}
+			else if (strncmp(input, TYPE, 5 * sizeof(char)) == 0) {
+				char *buffer = malloc(100 * sizeof(char));
+				strcpy(buffer, input + 5);
+				myType(buffer);
 				free(buffer);
 				continue;
 			}
-			else if (doubleQuoteCheck(buffer) == true) {
-				if (doubleQuotesHasBackSlash(buffer) == true) {
-					parseStringWithEscapeDoubleQuotes(buffer);
+			else if (strcmp(input, PWD) == 0) {
+				myPwd();
+				continue;
+			}
+			else if (strncmp(input, CD, 2 * sizeof(char)) == 0) {
+				myCd(input + 3);
+			}
+			else if (strncmp(input, CAT, 3 * sizeof(char)) == 0) {
+				char *buffer = malloc(100 * sizeof(char));
+				strcpy(buffer, input + 4);
+				if (singleQuoteCheck(buffer) == true) {
+					char *argv[15];
+					int argc = 0;
+					char *current = buffer;
+					while (*current != '\0' && argc < 15) {
+						while (isspace(*current) == true) {
+							current++;
+						}
+						if (*current == '\'') {
+							current++;
+							argv[argc++] = current;
+							while (*current != '\'' && *current != '\0') {
+								current++;
+							}
+							if (*current == '\'') {
+								*current++ = '\0';
+							}
+						} else {
+							argv[argc++] = current;
+							while (isspace(*current) == false&& *current != '\0') {
+								current++;
+							}
+							if (*current != '\0') {
+								*current++ = '\0';
+							}
+						}
+					}
+					argv[argc] = NULL;
+					myCat(argc, argv);
+					free(buffer);
+					continue;
+				}
+				else if (doubleQuoteCheck(buffer) == true) {
+					char *argv[15];
+					int argc = 0;
+					char *current = buffer;
+					while (*current != '\0' && argc < 15) {
+						while (isspace(*current) == true) {
+							current++;
+						}
+						if (*current == '\'' || *current == '\"') {
+							char quote = *current++; 
+							argv[argc++] = current;  
+							while (*current != quote && *current != '\0') current++;
+							if (*current == quote) {
+								*current++ = '\0'; 
+							}
+						} else {
+							argv[argc++] = current;
+							while (isspace(*current) == false && *current != '\0') {
+								current++;
+							}
+							if (*current != '\0') {
+								*current++ = '\0';
+							}  
+						}
+					}
+					argv[argc] = NULL;
+					myCat(argc, argv);
 					free(buffer);
 					continue;
 				}
 				else {
-					buffer = parseDoubleQuote(buffer);
-					printf("%s\n", buffer);
+					char *argv[15];
+					int argc = 0;
+					char *current = buffer;
+					while (*current != '\0' && argc < 15) {
+						while (isspace(*current) == true) {
+							current++;
+						}	
+					}
 					free(buffer);
 					continue;
 				}
 			}
 			else {
-				noQuoteParse(buffer);
-				buffer = parseStringWithEscapeNoQuotes(buffer);
-				myEcho(buffer);
-				free(buffer);
-				continue;
-			}
-		}
-		else if (strncmp(input, TYPE, 5 * sizeof(char)) == 0) {
-			char *buffer = malloc(100 * sizeof(char));
-			strcpy(buffer, input + 5);
-			myType(buffer);
-			free(buffer);
-			continue;
-		}
-		else if (strcmp(input, PWD) == 0) {
-			myPwd();
-			continue;
-		}
-		else if (strncmp(input, CD, 2 * sizeof(char)) == 0) {
-			myCd(input + 3);
-		}
-		else if (strncmp(input, CAT, 3 * sizeof(char)) == 0) {
-			char *buffer = malloc(100 * sizeof(char));
-			strcpy(buffer, input + 4);
-			if (singleQuoteCheck(buffer) == true) {
 				char *argv[15];
 				int argc = 0;
-				char *current = buffer;
+				char *current = input;
 				while (*current != '\0' && argc < 15) {
 					while (isspace(*current) == true) {
 						current++;
-					}
-					if (*current == '\'') {
-						current++;
-						argv[argc++] = current;
-						while (*current != '\'' && *current != '\0') {
-							current++;
-						}
-						if (*current == '\'') {
-							*current++ = '\0';
-						}
-					} else {
-						argv[argc++] = current;
-						while (isspace(*current) == false&& *current != '\0') {
-							current++;
-						}
-						if (*current != '\0') {
-							*current++ = '\0';
-						}
-					}
-				}
-				argv[argc] = NULL;
-				myCat(argc, argv);
-				free(buffer);
-				continue;
-			}
-			else if (doubleQuoteCheck(buffer) == true) {
-				char *argv[15];
-    			int argc = 0;
-				char *current = buffer;
-				while (*current != '\0' && argc < 15) {
-					while (isspace(*current) == true) {
-						current++;
-					}
+					} 
 					if (*current == '\'' || *current == '\"') {
-						char quote = *current++; 
-						argv[argc++] = current;  
+						char quote = *current++;
+						argv[argc++] = current;
 						while (*current != quote && *current != '\0') current++;
-						if (*current == quote) {
-							*current++ = '\0'; 
-						}
+						if (*current == quote) *current++ = '\0';
 					} else {
 						argv[argc++] = current;
-						while (isspace(*current) == false && *current != '\0') {
-							current++;
-						}
-						if (*current != '\0') {
-							*current++ = '\0';
-						}  
+						while (isspace(*current) == false && *current != '\0') current++;
+						if (*current != '\0') *current++ = '\0';
 					}
 				}
 				argv[argc] = NULL;
-				myCat(argc, argv);
-				free(buffer);
-				continue;
-			}
-			else {
-				char *argv[15];
-				int argc = 0;
-				char *current = buffer;
-				while (*current != '\0' && argc < 15) {
-					while (isspace(*current) == true) {
-						current++;
-					}	
+				char *path = getFile(argv[0]);
+				if (path != NULL) {
+					myExec(path, argc, argv);
 				}
-				free(buffer);
-				continue;
-			}
-		}
-		else {
-			char *argv[15];
-			int argc = 0;
-			char *current = input;
-			while (*current != '\0' && argc < 15) {
-				while (isspace(*current) == true) {
-					current++;
-				} 
-				if (*current == '\'' || *current == '\"') {
-					char quote = *current++;
-					argv[argc++] = current;
-					while (*current != quote && *current != '\0') current++;
-					if (*current == quote) *current++ = '\0';
-				} else {
-					argv[argc++] = current;
-					while (isspace(*current) == false && *current != '\0') current++;
-					if (*current != '\0') *current++ = '\0';
+				else {
+					printf("%s: command not found\n", argv[0]);
 				}
-			}
-			argv[argc] = NULL;
-			char *path = getFile(argv[0]);
-			if (path != NULL) {
-				myExec(path, argc, argv);
-			}
-			else {
-				printf("%s: command not found\n", argv[0]);
 			}
 		}
 	}
