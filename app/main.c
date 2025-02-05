@@ -48,6 +48,7 @@ static char *stripQuotesAndEscapes(char *str);
 static int redirectStdoutToFile(const char *filename);
 static int redirectStderrToFile(const char *filename);
 static int appendStdoutToFile(const char *filename);
+static int appendStderrToFile(const char *filename);
 
 ///////////////////////////////////////////////////////////////////////////////
 // MAIN FUNCTION
@@ -71,36 +72,54 @@ static int driver(void) {
 		char *redirStdout = strstr(input, "1>");
 		char *redirStderr = strstr(input, "2>");
 		char *redirStdoutAppend = strstr(input, "1>>");
+		char *redirStderrAppend = strstr(input, "2>>");
 		char *append = strstr(input, ">>");
 
         char *redir = NULL;
-		// 0 = no redirection, 1 = stdout, 2 = stderr, 3 = stdout append
+		// 0 = no redirection, 1 = stdout, 2 = stderr, 3 = stdout append, 4 = stderr append
         int redirectType = 0;
-        if (redirStdoutAppend != NULL) { 
-            memmove(redirStdoutAppend, redirStdoutAppend + 1, strlen(redirStdoutAppend)); // Remove `1`
+
+		if (redirStderrAppend != NULL) {
+			memmove(redirStderrAppend, redirStderrAppend + 1, strlen(redirStderrAppend)); 
+            redir = redirStderrAppend;
+			// Append stderr
+            redirectType = 4; 
+		} 
+		else if (redirStdoutAppend != NULL) { 
+			// Remove `1`
+            memmove(redirStdoutAppend, redirStdoutAppend + 1, strlen(redirStdoutAppend)); 
             redir = redirStdoutAppend;
-            redirectType = 3; // Append stdout
-        } else if (redirStderr != NULL) {
-            memmove(redirStderr, redirStderr + 1, strlen(redirStderr)); // Remove `2`
+			// Append stdout
+            redirectType = 3; 
+        } 
+		else if (redirStderr != NULL) {
+			// Remove `2`
+            memmove(redirStderr, redirStderr + 1, strlen(redirStderr)); 
             redir = redirStderr;
             redirectType = 2;
-        } else if (redirStdout != NULL) {
-            memmove(redirStdout, redirStdout + 1, strlen(redirStdout)); // Remove `1`
+        } 
+		else if (redirStdout != NULL) {
+			// Remove `1`
+            memmove(redirStdout, redirStdout + 1, strlen(redirStdout)); 
             redir = redirStdout;
             redirectType = 1;
-        } else if (append != NULL) {
+        } 
+		else if (append != NULL) {
             redir = append;
-            redirectType = 3; // Append stdout
-        } else {
+			// Append stdout
+            redirectType = 3; 
+        } 
+		else {
             redir = strchr(input, '>');
-            redirectType = 1; // Default to stdout
+			// Default to stdout
+            redirectType = 1; 
         }
 
         char *filename = NULL;
         if (redir != NULL) {
 			// Split command and filename
             *redir = '\0';  
-            redir += (redirectType == 3) ? 2 : 1;
+            redir += (redirectType == 3 || redirectType == 4) ? 2 : 1;
 			// Remove leading spaces
             while (isspace(*redir)) redir++; 
 			// ✅ Remove quotes from filename
@@ -124,6 +143,11 @@ static int driver(void) {
 					if (redirectStderrToFile(filename) == -1) {
 						continue;
 					}
+				else if (redirectType == 4) {
+					if (appendStderrToFile(filename) == -1) {
+						continue;
+					}
+				}
             }
 
             // Execute the command
@@ -169,7 +193,7 @@ static int driver(void) {
             fflush(stdout);
             if (redirectType == 1 || redirectType == 3) {
                 dup2(savedFd, STDOUT_FILENO);
-            } else if (redirectType == 2) {
+            } else if (redirectType == 2 || redirectType == 4) {
                 dup2(savedFd, STDERR_FILENO);
             }
             close(savedFd);
@@ -804,3 +828,19 @@ static int appendStdoutToFile(const char *filename) {
     return 0;
 }
 
+static int appendStderrToFile(const char *filename) {
+    int fd = open(filename, O_WRONLY | O_CREAT | O_APPEND, 0644); 
+    if (fd == -1) {
+        perror("open");
+        return -1;
+    }
+
+    if (dup2(fd, STDERR_FILENO) == -1) {
+        perror("dup2");
+        close(fd);
+        return -1;
+    }
+
+    close(fd);
+    return 0;
+}
