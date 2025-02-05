@@ -47,6 +47,7 @@ static bool doubleQuotesHasBackSlash(char *str);
 static char *stripQuotesAndEscapes(char *str);
 static int redirectStdoutToFile(const char *filename);
 static int redirectStderrToFile(const char *filename);
+static int appendStdoutToFile(const char *filename);
 
 ///////////////////////////////////////////////////////////////////////////////
 // MAIN FUNCTION
@@ -69,46 +70,66 @@ static int driver(void) {
 
 		char *redirStdout = strstr(input, "1>");
 		char *redirStderr = strstr(input, "2>");
+		char *redirStdoutAppend = strstr(input, "1>>");
+		char *append = strstr(input, ">>");
 
         char *redir = NULL;
-        int redirectType = 0; // 0 = no redirection, 1 = stdout, 2 = stderr
-        if (redirStderr != NULL) {
-            memmove(redirStderr, redirStderr + 1, strlen(redirStderr));  // Remove '2'
+		// 0 = no redirection, 1 = stdout, 2 = stderr, 3 = stdout append
+        int redirectType = 0;
+        if (redirStdoutAppend != NULL) { 
+            memmove(redirStdoutAppend, redirStdoutAppend + 1, strlen(redirStdoutAppend)); // Remove `1`
+            redir = redirStdoutAppend;
+            redirectType = 3; // Append stdout
+        } else if (redirStderr != NULL) {
+            memmove(redirStderr, redirStderr + 1, strlen(redirStderr)); // Remove `2`
             redir = redirStderr;
             redirectType = 2;
         } else if (redirStdout != NULL) {
-            memmove(redirStdout, redirStdout + 1, strlen(redirStdout));  // Remove '1'
+            memmove(redirStdout, redirStdout + 1, strlen(redirStdout)); // Remove `1`
             redir = redirStdout;
             redirectType = 1;
+        } else if (append != NULL) {
+            redir = append;
+            redirectType = 3; // Append stdout
         } else {
             redir = strchr(input, '>');
-            redirectType = 1;  // Default redirection is stdout
+            redirectType = 1; // Default to stdout
         }
 
         char *filename = NULL;
         if (redir != NULL) {
-            *redir = '\0';  // Split command and filename
-            redir++;
-            while (isspace(*redir)) redir++; // Remove leading spaces
-            filename = stripQuotesAndEscapes(redir); // ✅ Remove quotes from filename
+			// Split command and filename
+            *redir = '\0';  
+            redir += (redirectType == 3) ? 2 : 1;
+			// Remove leading spaces
+            while (isspace(*redir)) redir++; 
+			// ✅ Remove quotes from filename
+            filename = stripQuotesAndEscapes(redir); 
         	char *cleanedInput = stripQuotesAndEscapes(input);
 
 			int savedFd = -1;
 			if (filename != NULL) {
-            savedFd = (redirectType == 1) ? dup(STDOUT_FILENO) : dup(STDERR_FILENO);
-            if (redirectType == 1) {
-                if (redirectStdoutToFile(filename) == -1) {
-                    continue;
-                }
-            } else if (redirectType == 2) {
-                if (redirectStderrToFile(filename) == -1) {
-                    continue;
-                }
+				savedFd = (redirectType == 1 || redirectType == 3) ? dup(STDOUT_FILENO) : dup(STDERR_FILENO);
+				if (redirectType == 1) {
+					if (redirectStdoutToFile(filename) == -1) {
+						continue;
+					}
+				} 
+				else if (redirectType == 3) {
+					if (appendStdoutToFile(filename) == -1) {
+						continue;
+					}
+				}
+				else if (redirectType == 2) {
+					if (redirectStderrToFile(filename) == -1) {
+						continue;
+					}
             }
 
             // Execute the command
             char *token = strtok(cleanedInput, " ");
-            if (token == NULL) continue; // Ignore empty input
+			// Ignore empty input
+            if (token == NULL) continue; 
 
             if (strcmp(token, "echo") == 0) {
                 myEcho(cleanedInput + 5);
@@ -146,7 +167,7 @@ static int driver(void) {
 
             if (filename != NULL) {
             fflush(stdout);
-            if (redirectType == 1) {
+            if (redirectType == 1 || redirectType == 3) {
                 dup2(savedFd, STDOUT_FILENO);
             } else if (redirectType == 2) {
                 dup2(savedFd, STDERR_FILENO);
@@ -297,31 +318,37 @@ static int driver(void) {
 
 					while (*current != '\0' && argc < 15) {
 						while (isspace(*current)) {
-							current++;  // Skip leading spaces
+							// Skip leading spaces
+							current++;  
 						}
 
 						if (*current == '\'' || *current == '\"') {
-							char quote = *current++;  // Detect if it's single or double quote
-							argv[argc++] = current;   // Save start of filename
+							// Detect if it's single or double quote
+							char quote = *current++;  
+							// Save start of filename
+							argv[argc++] = current;   
 							while (*current != quote && *current != '\0') {
 								current++;
 							}
 							if (*current == quote) {
-								*current++ = '\0';  // Terminate string
+								// Terminate string
+								*current++ = '\0';  
 							}
 						} else {
-							argv[argc++] = current;  // Save unquoted filename
+							// Save unquoted filename
+							argv[argc++] = current;  
 							while (*current != '\0' && !isspace(*current)) {
 								current++;
 							}
 							if (*current != '\0') {
-								*current++ = '\0';  // Terminate filename
+								// Terminate filename
+								*current++ = '\0';  
 							}
 						}
 					}
 					argv[argc] = NULL;
-
-					myCat(argc, argv);  // Execute cat with parsed filenames
+					// Execute cat with parsed filenames
+					myCat(argc, argv);  
 					free(buffer);
     				continue;
 				}
@@ -457,7 +484,8 @@ static void myTypeFile(char *str) {
 
 static void myExec(char *path, int argc, char **argv) {
     pid_t pid = fork();
-    if (pid == 0) { // Child process
+    if (pid == 0) { 
+		// Child process
         execv(path, argv);
         perror("execv");
         exit(1);
@@ -666,9 +694,11 @@ static void parseStringWithEscapeDoubleQuotes(const char *input) {
 
     while (input[i] != '\0') {
         if (input[i] == '\'' && !in_double_quotes) {
-            in_single_quotes = !in_single_quotes; // Toggle single quotes
+			// Toggle single quotes
+            in_single_quotes = !in_single_quotes; 
         } else if (input[i] == '"' && !in_single_quotes) {
-            in_double_quotes = !in_double_quotes; // Toggle double quotes
+			// Toggle double quotes
+            in_double_quotes = !in_double_quotes; 
         } else if (input[i] == '\\' && input[i + 1] != '\0') {
             // Handle escape sequences
             i++;
@@ -677,10 +707,12 @@ static void parseStringWithEscapeDoubleQuotes(const char *input) {
             } else if (input[i] == 't') {
                 putchar('\t');
             } else {
-                putchar(input[i]); // Print the escaped character
+				// Print the escaped character
+                putchar(input[i]); 
             }
         } else {
-            putchar(input[i]); // Print normal characters
+			// Print normal characters
+            putchar(input[i]); 
         }
         i++;
     }
@@ -711,7 +743,8 @@ static char *stripQuotesAndEscapes(char *str) {
         } else if (str[i] == quoteType && inQuotes) {
             inQuotes = false;
         } else if (str[i] == '\\' && i + 1 < len) {
-            result[idx++] = str[++i];  // Add escaped character
+			// Add escaped character
+            result[idx++] = str[++i];  
         } else {
             result[idx++] = str[i];
         }
@@ -753,3 +786,21 @@ static int redirectStderrToFile(const char *filename) {
     close(fd);
     return 0;
 }
+
+static int appendStdoutToFile(const char *filename) {
+    int fd = open(filename, O_WRONLY | O_CREAT | O_APPEND, 0644); 
+    if (fd == -1) {
+        perror("open");
+        return -1;
+    }
+
+    if (dup2(fd, STDOUT_FILENO) == -1) {
+        perror("dup2");
+        close(fd);
+        return -1;
+    }
+
+    close(fd);
+    return 0;
+}
+
