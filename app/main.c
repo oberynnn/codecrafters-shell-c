@@ -66,11 +66,12 @@ static int driver(void) {
 		int inputLength = strlen(input);
 		input[strcspn(input, "\n")] = '\0';
 
-		char *redir = strstr(input, "1>");
-        if (redir != NULL) {
-            memmove(redir, redir + 1, strlen(redir));  // Remove '1'
+		char *redirStdout = strstr(input, "1>");
+        if (redirStdout != NULL) {
+            memmove(redirStdout, redirStdout + 1, strlen(redirStdout));  // Remove '1'
         }
-        redir = strchr(input, '>'); // Find `>`
+
+        char *redir = strchr(input, '>'); // Find `>`
 
         char *filename = NULL;
         if (redir != NULL) {
@@ -710,4 +711,21 @@ static int redirectStdoutToFile(const char *filename) {
     
     close(fd);
     return 0;
+}
+
+static int redirectStderrToFile(const char *filename) {
+	int fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+	if (fd == -1) {
+		perror("open");
+		return -1;
+	}
+
+	if (dup2(fd, STDERR_FILENO) == -1) {
+		perror("dup2");
+		close(fd);
+		return -1;
+	}
+
+	close(fd);
+	return 0;
 }
