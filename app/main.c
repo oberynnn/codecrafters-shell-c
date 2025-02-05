@@ -46,6 +46,7 @@ static void parseStringWithEscapeDoubleQuotes(const char *input);
 static bool doubleQuotesHasBackSlash(char *str);
 static char *stripQuotesAndEscapes(char *str);
 static int redirectStdoutToFile(const char *filename);
+static int redirectStderrToFile(const char *filename);
 
 ///////////////////////////////////////////////////////////////////////////////
 // MAIN FUNCTION
@@ -67,11 +68,22 @@ static int driver(void) {
 		input[strcspn(input, "\n")] = '\0';
 
 		char *redirStdout = strstr(input, "1>");
-        if (redirStdout != NULL) {
-            memmove(redirStdout, redirStdout + 1, strlen(redirStdout));  // Remove '1'
-        }
+		char *redirStderr = strstr(input, "2>");
 
-        char *redir = strchr(input, '>'); // Find `>`
+        char *redir = NULL;
+        int redirectType = 0; // 0 = no redirection, 1 = stdout, 2 = stderr
+        if (redirStderr != NULL) {
+            memmove(redirStderr, redirStderr + 1, strlen(redirStderr));  // Remove '2'
+            redir = redirStderr;
+            redirectType = 2;
+        } else if (redirStdout != NULL) {
+            memmove(redirStdout, redirStdout + 1, strlen(redirStdout));  // Remove '1'
+            redir = redirStdout;
+            redirectType = 1;
+        } else {
+            redir = strchr(input, '>');
+            redirectType = 1;  // Default redirection is stdout
+        }
 
         char *filename = NULL;
         if (redir != NULL) {
@@ -81,11 +93,17 @@ static int driver(void) {
             filename = stripQuotesAndEscapes(redir); // ✅ Remove quotes from filename
         	char *cleanedInput = stripQuotesAndEscapes(input);
 
+			int savedFd = -1;
 			if (filename != NULL) {
-            int saved_stdout = dup(STDOUT_FILENO);
-            if (redirectStdoutToFile(filename) == -1) {
-                free(cleanedInput);
-                continue; // Error handling, skip this iteration
+            savedFd = (redirectType == 1) ? dup(STDOUT_FILENO) : dup(STDERR_FILENO);
+            if (redirectType == 1) {
+                if (redirectStdoutToFile(filename) == -1) {
+                    continue;
+                }
+            } else if (redirectType == 2) {
+                if (redirectStderrToFile(filename) == -1) {
+                    continue;
+                }
             }
 
             // Execute the command
@@ -126,9 +144,15 @@ static int driver(void) {
                 }
             }
 
+            if (filename != NULL) {
             fflush(stdout);
-            dup2(saved_stdout, STDOUT_FILENO); // Restore stdout
-            close(saved_stdout);
+            if (redirectType == 1) {
+                dup2(savedFd, STDOUT_FILENO);
+            } else if (redirectType == 2) {
+                dup2(savedFd, STDERR_FILENO);
+            }
+            close(savedFd);
+        }
         } else {
             // Execute command normally (without redirection)
             if (strcmp(cleanedInput, "exit 0") == 0) {
@@ -714,18 +738,18 @@ static int redirectStdoutToFile(const char *filename) {
 }
 
 static int redirectStderrToFile(const char *filename) {
-	int fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC, 0644);
-	if (fd == -1) {
-		perror("open");
-		return -1;
-	}
+    int fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    if (fd == -1) {
+        perror("open");
+        return -1;
+    }
 
-	if (dup2(fd, STDERR_FILENO) == -1) {
-		perror("dup2");
-		close(fd);
-		return -1;
-	}
+    if (dup2(fd, STDERR_FILENO) == -1) {
+        perror("dup2");
+        close(fd);
+        return -1;
+    }
 
-	close(fd);
-	return 0;
+    close(fd);
+    return 0;
 }
