@@ -69,10 +69,10 @@ static int driver(void) {
 		int inputLength = strlen(input);
 		input[strcspn(input, "\n")] = '\0';
 
-		char *redirStdout = strstr(input, "1>");
-		char *redirStderr = strstr(input, "2>");
 		char *redirStdoutAppend = strstr(input, "1>>");
 		char *redirStderrAppend = strstr(input, "2>>");
+		char *redirStdout = strstr(input, "1>");
+		char *redirStderr = strstr(input, "2>");
 		char *append = strstr(input, ">>");
 
         char *redir = NULL;
@@ -841,6 +841,7 @@ static int appendStderrToFile(const char *filename) {
         return -1;
     }
 
+	fflush(stderr);
     close(fd);
     return 0;
 }
