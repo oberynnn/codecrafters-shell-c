@@ -1,34 +1,52 @@
-[![progress-banner](https://backend.codecrafters.io/progress/shell/6539c188-ba3e-4589-95bd-5985ead2428d)](https://app.codecrafters.io/users/codecrafters-bot?r=2qF)
+# Codecrafters Shell in C
 
-This is a starting point for C solutions to the
-["Build Your Own Shell" Challenge](https://app.codecrafters.io/courses/shell/overview).
+A simple, Unix-like terminal shell written in C that demonstrates robust process management, command parsing, and system-level programming. This project is designed to showcase fundamental operating system concepts and low-level programming skills—making it an ideal example for both academic research and industry evaluation.
 
-In this challenge, you'll build your own POSIX compliant shell that's capable of
-interpreting shell commands, running external programs and builtin commands like
-cd, pwd, echo and more. Along the way, you'll learn about shell command parsing,
-REPLs, builtin commands, and more.
+## Features
 
-**Note**: If you're viewing this repo on GitHub, head over to
-[codecrafters.io](https://codecrafters.io) to try the challenge.
+- **Command Parsing & Execution**: Interprets user input and executes built-in or system commands.
+- **Process Management**: Demonstrates creation and management of child processes using system calls.
+- **I/O Redirection & Piping**: Implements basic input/output redirection and piping to chain commands.
+- **Background Execution**: Supports executing processes in the background.
+- **Modular & Extensible Design**: Clean code structure designed for easy expansion and maintenance.
 
-# Passing the first stage
+## Why This Project?
 
-The entry point for your `shell` implementation is in `app/main.c`. Study and
-uncomment the relevant code, and push your changes to pass the first stage:
+- Explore practical implementations of OS concepts like process control, inter-process communication, and command-line parsing in a concise and readable codebase.
+- Evaluate hands-on experience with C programming, system-level programming, and problem-solving in a real-world-like project. This shell project is a testament to strong foundational skills in computer science and software engineering.
 
-```sh
-git commit -am "pass 1st stage" # any msg
-git push origin master
+## Installation
+**Clone the Repository**
+   ```bash
+   git clone https://github.com/oberynnn/codecrafters-shell-c.git
+   cd codecrafters-shell-c
+   ```
+Compile the Shell
+```bash
+gcc -o shell main.c
 ```
 
-Time to move on to the next stage!
+Alternatively, compile manually:
+```bash
+gcc -o shell main.c
+```
+Run the Shell
+``` bash
+./shell
+```
+## Usage
 
-# Stage 2 & beyond
+Once the shell is running, you can execute standard commands, use I/O redirection, and run processes in the background. The shell provides a simple interface that mimics common Unix terminal behavior.
 
-Note: This section is for stages 2 and beyond.
+## Contributing
 
-1. Ensure you have `c (9.2)` installed locally
-1. Run `./your_program.sh` to run your program, which is implemented in
-   `app/main.c`.
-1. Commit your changes and run `git push origin master` to submit your solution
-   to CodeCrafters. Test output will be streamed to your terminal.
+Contributions, suggestions, and feedback are welcome! If you'd like to enhance the shell or address issues, please fork the repository and submit a pull request.
+
+## License
+
+This project is licensed under the MIT License. See the LICENSE file for details.
+
+## Acknowledgments
+
+Inspired by Codecrafters challenges and exercises.
+Thanks to all the open-source contributors whose work underpins this project.
